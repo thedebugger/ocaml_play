@@ -11,5 +11,4 @@ Bare bone project to make applications easy to develop
 * http://caml.inria.fr/pub/docs/manual-ocaml/
 * https://gist.github.com/henrytill/7c1831b31d7780e64a2d53120aee13a1
 * https://learntla.com/book/
-
-
+* https://atd.readthedocs.io/en/latest/tutorial.html#what-is-atdgen

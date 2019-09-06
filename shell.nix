@@ -84,5 +84,6 @@ mkShell {
     cohttp
     cryptokit
     menhir
+    atdgen
   ]);
 }

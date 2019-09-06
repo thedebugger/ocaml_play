@@ -2,6 +2,7 @@ open Core
 open Cohttp
 open Cohttp_async
 open Async
+open Raft_api_client
 
 let filename_param =
   let open Command.Param in

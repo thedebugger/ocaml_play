@@ -9,3 +9,7 @@ clean:
 
 run:
 	_build/default/play.bc
+
+gen:
+	atdgen -t raft.atd
+	atdgen -j raft.atd
