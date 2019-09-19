@@ -85,5 +85,6 @@ mkShell {
     cryptokit
     menhir
     atdgen
+	ocamlformat
   ]);
 }

@@ -2,7 +2,8 @@ open Core
 open Cohttp
 open Cohttp_async
 open Async
-open Raft_api_client
+open Raft_t
+open Raft_api
 
 let filename_param =
   let open Command.Param in
@@ -11,11 +12,19 @@ let filename_param =
 (*http://dev.realworldocaml.org/command-line-parsing.html#basic-command-line-parsing*)
 
 let client_cmd =
-  Command.basic
+  Command.async
     ~summary:"client"
     ~readme:(fun () -> "More detailed information")
     (Command.Param.map filename_param ~f:(fun filename ->
-         (fun () -> printf "filename is %s\n" filename)))
+         (fun () ->
+			let req = {candidate_id = 1; term = 2; last_long_term = 3; last_long_index = 4;} in
+			try Raft_api_client.vote req
+				>>| fun res -> printf "filename is %s %d\n" filename res.term
+			with e ->
+				let msg = Exn.to_string e in
+				printf "Exception occured %s \n" msg;
+				return ()
+		 )))
 
 let server filename =
   let callback ~body not_used req =
