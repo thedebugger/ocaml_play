@@ -12,3 +12,4 @@ Bare bone project to make applications easy to develop
 * https://gist.github.com/henrytill/7c1831b31d7780e64a2d53120aee13a1
 * https://learntla.com/book/
 * https://atd.readthedocs.io/en/latest/tutorial.html#what-is-atdgen
+* http://www.ocamlpro.com/2019/09/13/updated-cheat-sheets-ocaml-language-and-ocaml-standard-library/

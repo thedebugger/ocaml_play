@@ -13,3 +13,6 @@ run:
 gen:
 	atdgen -t raft.atd
 	atdgen -j raft.atd
+
+fmt:
+	dune build @fmt --auto-promote
