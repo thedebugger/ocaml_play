@@ -1,5 +1,4 @@
 open Core
-open Cohttp
 open Cohttp_async
 open Async
 open Raft_t
@@ -26,25 +25,20 @@ let client_cmd =
            printf "Exception occured %s \n" msg ;
            return () ))
 
-let server filename =
-  let callback ~body not_used req =
-    let address =
-      Async_unix__Unix_syscalls.Socket.Address.Inet.to_string not_used
-    in
-    let uri = req |> Request.uri |> Uri.to_string in
-    let meth = req |> Request.meth |> Code.string_of_method in
-    let headers = req |> Request.headers |> Header.to_string in
-    Cohttp_async.Body.to_string body
-    >>| (fun body ->
-          Printf.sprintf
-            "Uri: %s\n\
-             Method: %s\n\
-             Headers\n\
-             Headers: %s\n\
-             Body: %s\n\
-             Filename: %s address: %s"
-            uri meth headers body filename address )
-    >>= fun _ -> Server.respond_string ~status:`OK "works"
+let server _ =
+  let callback ~body _ req =
+    let path = req |> Request.uri |> Uri.path in
+    match path with
+    | "/vote" ->
+        Cohttp_async.Body.to_string body
+        >>= fun body ->
+        let vote_req = Raft_j.vote_request_of_string body in
+        Raft_api_server.vote vote_req
+        >>= fun res ->
+        Server.respond_string ~status:`OK (Raft_j.string_of_vote_response res)
+    | _ ->
+        Server.respond_string ~status:`Not_found
+          (Printf.sprintf "Route %s not found" path)
   in
   Server.create ~on_handler_error:`Raise
     (Tcp.Where_to_listen.of_port 8000)

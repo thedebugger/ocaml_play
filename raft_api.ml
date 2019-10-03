@@ -14,8 +14,10 @@ module Raft_api_client : Raft_api = struct
   let append_entries _ = {term= 1; success= false}
 
   (* https://github.com/mirage/ocaml-cohttp/blob/master/examples/async/s3_cp.ml *)
-  let make_request ~body ~host ~meth =
-    let uri = Printf.sprintf "http://%s/%s" host meth |> Uri.of_string in
+  let make_request ~body ~port ~host ~meth =
+    let uri =
+      Printf.sprintf "http://%s:%d/%s" host port meth |> Uri.of_string
+    in
     let headers = [] @ [("Host", host)] in
     let request =
       Request.make ~meth:`POST ~headers:(Header.of_list headers) uri
@@ -23,8 +25,7 @@ module Raft_api_client : Raft_api = struct
     let headers = headers |> Header.of_list in
     let request = {request with Cohttp.Request.headers} in
     let body = Body.of_string body in
-    Core.Printf.printf "Inside body" ;
-    Cohttp_async.Client.request ~body request
+    Cohttp_async.Client.request ~body ~uri request
     >>= fun (res, res_body) ->
     match Cohttp.Response.(res.status) with
     | #Code.success_status ->
@@ -38,6 +39,12 @@ module Raft_api_client : Raft_api = struct
   let vote req =
     make_request
       ~body:(Raft_j.string_of_vote_request req)
-      ~host:"localhost" ~meth:"test"
+      ~host:"localhost" ~port:8000 ~meth:"vote"
     >>| fun b -> Raft_j.vote_response_of_string b
+end
+
+module Raft_api_server : Raft_api = struct
+  let vote _ = return {term= 1; vote_granted= false}
+
+  let append_entries _ = {term= 1; success= false}
 end
