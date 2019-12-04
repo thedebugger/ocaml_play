@@ -38,7 +38,8 @@ let
 
   };
 
-  dune = stdenv.mkDerivation rec {
+  # dune 1.11 is available in latest nixpkgs
+  dune_not_used = stdenv.mkDerivation rec {
     name = "dune-${version}";
     version = "1.8.2";
     src = fetchurl {

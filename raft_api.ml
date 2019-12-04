@@ -18,7 +18,10 @@ module Raft_api_client : Raft_api = struct
     let uri =
       Printf.sprintf "http://%s:%d/%s" host port meth |> Uri.of_string
     in
-    let headers = [] @ [("Host", host)] in
+    let headers =
+      [("Content-length", Int.to_string (String.length body))]
+      @ [("Host", host)]
+    in
     let request =
       Request.make ~meth:`POST ~headers:(Header.of_list headers) uri
     in
