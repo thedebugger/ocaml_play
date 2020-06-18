@@ -3,6 +3,7 @@ open Cohttp_async
 open Async
 open Raft_t
 open Raft_api
+open Raft_control
 
 let filename_param =
   let open Command.Param in
@@ -45,7 +46,14 @@ let server _ =
     callback
 
 let run_server filename =
+  let timer = Timer.create ~timeout_millis:5000 in
+  let l =
+    Raft_control_loop.create
+      {mode= Follower; per_state= {current_term= 1; voted_for= 2; entries= []}}
+      timer
+  in
   ignore (server filename) ;
+  ignore (Raft_control_loop.run l) ;
   never_returns (Scheduler.go ())
 
 let server_cmd =

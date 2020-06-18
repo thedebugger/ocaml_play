@@ -14,3 +14,8 @@ Bare bone project to make applications easy to develop
 * https://atd.readthedocs.io/en/latest/tutorial.html#what-is-atdgen
 * http://www.ocamlpro.com/2019/09/13/updated-cheat-sheets-ocaml-language-and-ocaml-standard-library/
 * http://caml.inria.fr/pub/docs/manual-ocaml/coreexamples.html#s%3Atut-recvariants
+* [State monad](http://ocamllabs.io/iocamljs/monads.html)
+* [Timer implemenation](https://github.com/janestreet/core/blob/109.20.00/lib/timer.ml)
+* [Timer implemenation2]()
+* https://www.cs.cornell.edu/courses/cs3110/2014sp/lecture_notes.php
+* https://github.com/janestreet/async/blob/master/example/timeouts.ml

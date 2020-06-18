@@ -1,5 +1,5 @@
 shell:
-	nix-shell --packages ocamlPackages.findlib ocamlPackages.batteries
+	nix-shell
 
 build:
 	dune build play.bc
