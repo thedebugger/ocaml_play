@@ -26,7 +26,7 @@ let client_cmd =
            printf "Exception occured %s \n" msg ;
            return () ))
 
-let server _ =
+let server writer =
   let callback ~body _ req =
     let path = req |> Request.uri |> Uri.path in
     match path with
@@ -34,7 +34,12 @@ let server _ =
         Cohttp_async.Body.to_string body
         >>= fun body ->
         let vote_req = Raft_j.vote_request_of_string body in
-        Raft_api_server.vote vote_req
+        Deferred.create (fun i ->
+          if not (Pipe.is_closed w)
+          then(
+            let message = {req: vote_req; res: i; event: `VoteRPC}
+            Pipe.write w message)
+        )
         >>= fun res ->
         Server.respond_string ~status:`OK (Raft_j.string_of_vote_response res)
     | _ ->
@@ -45,14 +50,15 @@ let server _ =
     (Tcp.Where_to_listen.of_port 8000)
     callback
 
-let run_server filename =
+let run_server _ =
   let timer = Timer.create ~timeout_millis:5000 in
+  let r, w = Pipe.create () in
   let l =
     Raft_control_loop.create
-      {mode= Follower; per_state= {current_term= 1; voted_for= 2; entries= []}}
+      {mode= Follower; per_state= {current_term= 1; voted_for= 2; entries= []}; reader=r}
       timer
   in
-  ignore (server filename) ;
+  ignore (server w) ;
   ignore (Raft_control_loop.run l) ;
   never_returns (Scheduler.go ())
 

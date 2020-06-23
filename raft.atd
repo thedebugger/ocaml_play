@@ -31,3 +31,19 @@ type append_entries_response = {
     term: int;
     success: bool;
 }
+
+type raft_mode = [ Leader | Follower | Candidate]
+
+type raft_event = [Init|VoteRPC|AppendEntries|Timeout]
+
+type raft_persistent_state =
+  {current_term: int; voted_for: int; entries: log list}
+
+type candidate_state = {
+}
+
+type follower_state = {
+}
+
+type mode_state [candidate_state|follower_state]
+type raft_state = {mode: raft_mode; per_state: raft_persistent_state;  }
