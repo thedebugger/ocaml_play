@@ -47,84 +47,125 @@ module RaftState = State (struct
   type t = raft_state
 end)
 
+type request =
+  | Append_entries of append_entries_request
+  | Vote of vote_request
+  | TimeoutReq
+  | InitReq
+
+type response =
+  | Append_entries of append_entries_response
+  | Vote of vote_response
+  | TimeoutRes
+  | InitRes
+
+type message = {req: request; res: response Ivar.t; event: raft_event}
+
 module type Raft_control = sig
   type l
 
   val create : raft_state -> Timer.t -> l
 
   val run : l -> raft_state Deferred.t
+
+  (* optional election timeout ivar *)
+  val reset_timeout : unit Ivar.t Option.t -> unit
+  val start_timeout : timeout_millis:int -> writer_t:message Pipe.Writer.t -> unit Ivar.t -> unit Deferred.t
   (*
 	val timeout: raft_state -> run_state Deferred.t
 	let vote: req:vote_request -> s:raft_state -> (vote_response, raft_state) Deferred.t
   *)
 end
 
-type timeout_request = {}
-type timeout_response = {}
-type init_request = {}
-type init_response = {}
-type request = [append_entries_request|vote_request|timeout_request|init_request]
-type response = [append_entries_response|vote_response|timeout_response|init_response]
-type message = { req: request; res: response IVar.t; event: event }
-
 module Raft_control_loop : Raft_control = struct
-  type l = {state: raft_state; election_timeout_var: unit Ivar.t Option.t; request_reader: message Reader.t; timeout_r: message Reader.t; timeout_w: message Writer.t }
+  type l =
+    { state: raft_state
+    ; election_timeout_var: unit Ivar.t Option.t
+    ; request_reader: message Pipe.Reader.t
+    ; timeout_r: message Pipe.Reader.t
+    ; timeout_w:
+        message Pipe.Writer.t
+        (* pending result of election timeout. it can only be pending if timeout_w has pending pushback deferred*)
+    ; election_timeout_res: unit Deferred.t }
 
   let create s t req_read =
-  	let r, w = Pipe.create () in
-		{state= s; election_timeout_var = Option.None; request_reader = req_read; timeout_r=r; timeout_w = w; }
+    let r, w = Pipe.create () in
+    { state= s
+    ; election_timeout_var= None
+    ; request_reader= req_read
+    ; timeout_r= r
+    ; timeout_w= w
+    ; election_timeout_res= return () }
+
+  let start_timeout span w cancel_ivar =
+    let cancel_def = Ivar.read cancel_ivar in
+    Async_unix.Clock.with_timeout span cancel_def
+    (* result takes precedence over timeout. not sure how worse is that??? *)
+    >>= function
+    | `Result _ ->
+        printf "Timeout cancelled succesfully" ;
+        return ()
+    | `Timeout ->
+        if not (Pipe.is_closed w) then
+          let i = Ivar.create () in
+          let message = {req= TimeoutReq; res= i; event= `Timeout} in
+          Pipe.write w message
+        else (
+          printf "WARN: Timeout writer closed??" ;
+          return () )
+
+  let reset_timeout i =
+    i
+    >>= fun ivar ->
+    Ivar.fill ivar TimeoutRes
+
+  (* takes previous state and message and returns next state*)
+  let process_message cur_state m =
+    match cur_state.state.mode with _ -> (
+      match m.event with
+      | `Init ->
+          (*
+          let new_election_timeout_res =
+            cur_state.election_timeout_res
+            >>=
+            let i = Ivar.create () in
+            start_timeout (Time.Span.of_sec 0.5) cur_state.timeout_w i
+          in
+          *)
+          cur_state
+      | `VoteRPC ->
+          (* likely race conditions here *)
+          reset_timeout cur_state.election_timeout_var ;
+          let res = Candidate.vote_rpc req cur_state in
+          (* return response back *)
+          Ivar.fill m.response res ;
+          (* start election timeout only after previous has finished *)
+          let new_election_timeout_res =
+            cur_state.election_timeout_res
+            >>=
+            let i = Ivar.create () in
+            start_timeout (Time.Span.of_sec 0.5) cur_state.timeout_w i
+          in
+          cur_state
+      | `Timeout ->
+          (* can't find any docs to close ivar. so ignore it *)
+          Candidate.handle_timeout printf "timeout expired" ;
+          (*TODO: change state? start election?*)
+          cur_state
+      | _ -> cur_state )
 
   let run l =
     let rec loop l =
       let req_choice = Pipe.read_choice l.request_reader in
       let timeout_choice = Pipe.read_choice l.timeout_r in
-			choose
-      [ req_choice;
-				timeout_choice;
-      ]
-    	>>> function
-			| `Ok m ->
-				let next_state = process_message l m
-				loop(next_state)
-			| _ -> printf "Inside control loop. Eof or Nothing available in what? pipe";
-				l
-		in
-		loop(l)
-
-	let start_timeout span w =
-		let i = Ivar.create () in
-		let cancel_def = Ivar.read i
-		in
-		Clock.with_timeout span cancel_def
-		>>| function
-		| `Result () -> print "Timeout cancelled succesfully"
-		| `Timeout ->
-			if not (Pipe.is_closed w)
-      then(
-				let message = {req= vote_req, res= i; event=Timeout}
-        Pipe.write w message)
-		;
-		return i
-
-	let reset_timeout i =
-		Ivar.fill i ()
-
-  (* takes previous state and message and returns next state*)
-  let process_message cur_state m =
-    match cur_state.mode with
-    | _ ->
-      match m.event with
-      | `Init ->
-        in
-				start_timeout (Time.Span.of_sec 0.5) cur_state.timeout_w
-      | `VoteRPC ->
-				reset_timeout cur_state.election_timeout_var
-        let res = Candidate.vote_rpc req cur_state in
-        cur_state
-      | `Timeout ->
-				reset_timeout cur_state.election_timeout_var
-        Candidate.handle_timeout printf "timeout expired";
-        cur_state
-    	| _ ->
-        prev_state
+      choose [req_choice; timeout_choice]
+      >>> function
+      | `Ok m ->
+          let next_state = process_message l m in
+          loop next_state
+      | _ ->
+          printf "Inside control loop. Eof or Nothing available in what? pipe" ;
+          l
+    in
+    loop l
 end
